@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indic Transcriber</title>
+<meta name="description" content="Transcribe Tamil, Malayalam, Hindi, Kannada, English and mixed speech, in the script it was spoken in.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,100..800&family=Anek+Tamil:wdth,wght@75..125,100..800&family=Anek+Malayalam:wdth,wght@75..125,100..800&family=Anek+Kannada:wdth,wght@75..125,100..800&family=Anek+Devanagari:wdth,wght@75..125,100..800&family=Anek+Telugu:wdth,wght@75..125,100..800&family=Anek+Bangla:wdth,wght@75..125,100..800&family=Anek+Gujarati:wdth,wght@75..125,100..800&family=Anek+Gurmukhi:wdth,wght@75..125,100..800&family=Anek+Odia:wdth,wght@75..125,100..800&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="layout">
+  <section class="side" aria-label="Settings">
+    <p class="status" id="status" data-state="wait" role="status" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span><span id="status-text">Connecting to the model…</span>
+    </p>
+
+    <h1 class="headline">
+      <span class="h-ta" lang="ta">சொன்னது</span>
+      <span class="h-ml" lang="ml">പറഞ്ഞത്</span>
+      <span class="h-en">exactly as it was said.</span>
+    </h1>
+    <p class="lede">Drop in recordings in Tamil, Malayalam, Hindi, Kannada, English or a mix of them. Each comes back in the script it was spoken in.</p>
+
+    <form class="settings" id="settings" onsubmit="return false">
+      <fieldset>
+        <legend>Engine</legend>
+        <div class="engines" id="engines"><p class="hint">Loading engines…</p></div>
+      </fieldset>
+
+      <div class="field">
+        <label for="lang">Language</label>
+        <select id="lang"></select>
+        <p class="hint">If a transcript comes out in the wrong script, pick the language here and transcribe it again.</p>
+      </div>
+
+      <fieldset id="mode-field" hidden>
+        <legend>English words</legend>
+        <div class="toggle">
+          <label><input type="radio" name="mode" value="mixed" checked><span>Keep in English</span></label>
+          <label><input type="radio" name="mode" value="native"><span>Write in native script</span></label>
+        </div>
+      </fieldset>
+    </form>
+
+    <div class="drop" id="drop" role="button" tabindex="0" aria-describedby="drop-hint">
+      <p class="drop-title">Drop recordings here</p>
+      <p class="drop-hint" id="drop-hint">or press to choose files. Audio or video, up to 100 MB each. Several at once is fine.</p>
+      <input type="file" id="file" multiple accept="audio/*,video/*" hidden>
+    </div>
+  </section>
+
+  <section class="list" aria-labelledby="list-title">
+    <header class="list-head">
+      <h2 id="list-title">Transcripts</h2>
+      <span class="count" id="count"></span>
+      <button class="primary" id="dl-all" type="button" hidden>Download all</button>
+    </header>
+    <p class="sr-only" id="announce" aria-live="polite"></p>
+    <p class="empty" id="empty">Nothing here yet. Transcripts appear here as each recording finishes.</p>
+    <ol class="items" id="items"></ol>
+  </section>
+</main>
+
+<footer class="footer">
+  Built with Indic-Transcribe from Bodhan AI / AI4Bharat. Whisper by OpenAI via faster-whisper. Runs on your own Colab session.
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<template id="item-tpl">
+  <li class="item">
+    <div class="item-head">
+      <div class="item-id">
+        <p class="name"></p>
+        <p class="meta"></p>
+      </div>
+      <span class="chip"></span>
+    </div>
+    <div class="bar" aria-hidden="true"></div>
+    <p class="error" hidden></p>
+    <div class="result" hidden>
+      <div class="text" tabindex="0" role="region"></div>
+      <div class="actions">
+        <button type="button" class="copy">Copy</button>
+        <button type="button" class="download">Download .txt</button>
+      </div>
+    </div>
+    <button type="button" class="retry" hidden>Try again</button>
+  </li>
+</template>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
