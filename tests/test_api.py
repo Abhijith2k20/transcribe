@@ -110,3 +110,28 @@ def test_locked_engine_is_rejected_and_reported(make_wav):
     e = client.get("/api/engines").json()[0]
     assert e["locked"] is True and e["available"] is False
     assert "Hugging Face token" in upload(client, make_wav()).json()["detail"]
+
+
+@pytest.mark.parametrize("ranked", [{"ta": 0.9, "ml": 0.1}, [("ta", 0.9), ("ml", 0.1)], ["ta", "ml"],
+                                    [{"lang": "ta", "prob": 0.9}], {"lang": "ta", "probs": {}}, "ta"])
+def test_top_lang_accepts_common_shapes(ranked):
+    from transcriber.engines.indic_flex import top_lang
+    assert top_lang(ranked) == "ta"
+
+
+def test_indic_detects_language_before_transcribing(make_wav):
+    from transcriber.engines.indic_flex import IndicFlex
+    calls = {}
+
+    class FakeASR:
+        def identify(self, path):
+            import wave
+            with wave.open(path) as w:
+                calls["clip_seconds"] = w.getnframes() / w.getframerate()
+            return [("ml", 0.8), ("ta", 0.2)]
+
+    eng = IndicFlex()
+    eng.asr = FakeASR()
+    eng.transcribe_long = lambda asr, wav, lang, mode: calls.setdefault("lang", lang) and "ഹലോ"
+    res = eng.transcribe(str(make_wav(seconds=40)), None, "mixed")
+    assert calls == {"clip_seconds": 30.0, "lang": "ml"} and res.language == "ml"

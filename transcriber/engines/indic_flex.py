@@ -1,10 +1,28 @@
 import inspect
+import os
 import sys
+import wave
 
 from .base import Engine, LicenseError, TranscriptResult, free_memory, is_license_error
 
 CORE_LANGS = ["en", "as", "bn", "brx", "doi", "gu", "hi", "kn", "ks", "kok", "mai", "ml", "mni",
               "mr", "ne", "or", "pa", "sa", "sat", "sd", "ta", "te", "ur", "bho", "bhb"]
+
+
+def top_lang(ranked):
+    """identify() returns 'a ranked distribution'; the card doesn't say which shape, so accept the usual ones."""
+    if isinstance(ranked, dict):
+        if isinstance(ranked.get("lang"), str):
+            return ranked["lang"]
+        return max(ranked, key=ranked.get)
+    if isinstance(ranked, str):
+        return ranked
+    first = ranked[0]
+    if isinstance(first, (tuple, list)):
+        return first[0]
+    if isinstance(first, dict):
+        return first.get("lang") or first.get("language")
+    return first
 
 
 class IndicEngine(Engine):
@@ -44,8 +62,23 @@ class IndicEngine(Engine):
             sys.path.remove(self.path)
         free_memory()
 
+    def detect_lang(self, wav_path):
+        """transcribe_long needs a real code ('auto' is rejected), so run the model's own LID on the first 30 s."""
+        clip = wav_path + ".lid.wav"
+        with wave.open(wav_path) as src, wave.open(clip, "wb") as dst:
+            dst.setparams(src.getparams())
+            dst.writeframes(src.readframes(src.getframerate() * 30))
+        try:
+            lang = top_lang(self.asr.identify(clip))
+        finally:
+            os.remove(clip)
+        if lang not in self.languages:
+            raise RuntimeError(f"Couldn't detect the language (got {lang!r}).")
+        return lang
+
     def transcribe(self, wav_path, lang, mode):
-        kw = {"lang": lang or "auto"}   # the model card's code for automatic language ID
+        lang = lang or self.detect_lang(wav_path)
+        kw = {"lang": lang}
         if self.pass_mode:
             kw["mode"] = mode
         out = self.transcribe_long(self.asr, wav_path, **kw)
