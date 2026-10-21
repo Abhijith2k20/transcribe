@@ -9,6 +9,28 @@ LANGS = ("af am ar as az ba be bg bn bo br bs ca cs cy da de el en es et eu fa f
          "vi yi yo zh yue").split()
 
 
+def preload_cuda12():
+    """ctranslate2 (faster-whisper) is built for CUDA 12. Newer Colab images ship CUDA 13, so load the
+    pip-installed CUDA 12 cuBLAS/cuDNN by hand; later dlopen calls by soname then find them."""
+    import ctypes
+    import glob
+    import site
+    import sys
+    dirs = {*sys.path, *site.getsitepackages()}
+    pending = sorted({f for d in dirs if d for pat in ("nvidia/cublas/lib/*.so.12", "nvidia/cudnn/lib/*.so.9")
+                      for f in glob.glob(os.path.join(d, pat))})
+    while pending:  # some libs depend on others, so retry until nothing new loads
+        failed = []
+        for f in pending:
+            try:
+                ctypes.CDLL(f, mode=ctypes.RTLD_GLOBAL)
+            except OSError:
+                failed.append(f)
+        if len(failed) == len(pending):
+            break
+        pending = failed
+
+
 class Whisper(Engine):
     id = "whisper"
     label = "Whisper"
@@ -23,8 +45,24 @@ class Whisper(Engine):
 
     def load(self, device):
         from faster_whisper import WhisperModel
-        self.model = WhisperModel(self.size, device=device,
-                                  compute_type="float16" if device == "cuda" else "int8")
+        if device == "cuda":
+            preload_cuda12()
+            try:
+                self.model = WhisperModel(self.size, device="cuda", compute_type="float16")
+                self._warm_up()  # CUDA libraries load lazily, so fail here rather than on the user's file
+                return
+            except Exception as e:
+                if "lib" not in str(e).lower() and "cuda" not in str(e).lower():
+                    raise
+                print(f"Whisper can't use the GPU ({e}). Falling back to CPU, which is much slower.")
+                self.model = None
+                free_memory()
+        self.model = WhisperModel(self.size, device="cpu", compute_type="int8")
+
+    def _warm_up(self):
+        import numpy as np
+        segments, _ = self.model.transcribe(np.zeros(16000, np.float32), language="en")
+        list(segments)
 
     def unload(self):
         self.model = None

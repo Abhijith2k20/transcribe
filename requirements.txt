@@ -6,3 +6,6 @@ huggingface_hub>=0.23,<2
 sentencepiece>=0.2,<1
 soundfile>=0.12,<1
 faster-whisper>=1.0,<2
+# faster-whisper's GPU backend needs CUDA 12 libraries; Colab may ship only CUDA 13.
+nvidia-cublas-cu12; sys_platform == "linux"
+nvidia-cudnn-cu12>=9,<10; sys_platform == "linux"
