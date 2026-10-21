@@ -74,7 +74,7 @@ def create_app(store: JobStore) -> FastAPI:
         if not job:
             raise HTTPException(404, "No such job. The Colab session may have restarted.")
         return {"status": job.status, "name": job.name, "engine": job.engine, "text": job.text,
-                "language": job.language, "error": job.error, "ahead": store.ahead(job),
+                "language": job.language, "segments": job.segments, "error": job.error, "ahead": store.ahead(job),
                 "elapsed_seconds": round(time.time() - job.started) if job.started else 0,
                 "audio_seconds": job.audio_seconds}
 

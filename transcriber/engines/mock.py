@@ -22,4 +22,6 @@ class Mock(Engine):
 
     def transcribe(self, wav_path, lang, mode):
         time.sleep(random.uniform(*self.delay))
-        return TranscriptResult(TEXT[mode], lang or "ta")
+        parts = [p.strip() + "." for p in TEXT[mode].split(".") if p.strip()]
+        segs = [{"start": i * 32.0, "end": i * 32.0 + 30, "text": p} for i, p in enumerate(parts)]
+        return TranscriptResult(" ".join(parts), lang or "ta", segs)

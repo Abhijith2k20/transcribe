@@ -26,6 +26,7 @@ class Job:
     status: str = "queued"
     text: str = ""
     language: str | None = None
+    segments: list[dict] | None = None
     error: str | None = None
     started: float | None = None
     audio_seconds: float | None = None
@@ -121,3 +122,4 @@ class JobStore:
             res = eng.transcribe(wav, job.lang or None, job.mode)
         job.text = res.text.strip() or NO_SPEECH
         job.language = res.language
+        job.segments = res.segments

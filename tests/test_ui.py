@@ -40,31 +40,34 @@ def test_upload_two_files(base_url, make_wav, tmp_path):
     SHOTS.mkdir(exist_ok=True)
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
-        ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
         ctx.grant_permissions(["clipboard-read", "clipboard-write"])
         page = ctx.new_page()
         page.goto(base_url)
-        pw.expect(page.locator("#status-text")).to_have_text("Model ready (no GPU, transcription will be slow)")
+        pw.expect(page.locator("#status")).to_have_text("Running without a GPU, so transcription will be slow.")
+        pw.expect(page.locator("#model")).to_have_value("mock")
         page.set_input_files("#file", files)
-        pw.expect(page.locator(".item .chip")).to_have_text(["Done", "Done"], timeout=10000)
-        pw.expect(page.locator("#count")).to_have_text("2 of 2 done")
-        pw.expect(page.locator("#empty")).to_be_hidden()
-        pw.expect(page.locator(".retry").first).to_be_hidden()
+        pw.expect(page.locator(".file-meta")).to_have_text(["16 KB · Ready", "16 KB · Ready"])
+        page.click("#start")
+        pw.expect(page.locator(".file-meta")).to_have_text(["16 KB · Done", "16 KB · Done"], timeout=10000)
+        pw.expect(page.locator("#output .seg time").first).to_have_text("00:00:00")
 
-        page.locator(".item .copy").first.click()
+        page.click("#copy")
         pw.expect(page.locator("#toast")).to_have_text("Copied")
         assert "office" in page.evaluate("navigator.clipboard.readText()")
 
         with page.expect_download() as dl:
-            page.click("#dl-all")
+            page.click("#download")
         z = tmp_path / "all.zip"
         dl.value.save_as(z)
         assert sorted(zipfile.ZipFile(z).namelist()) == ["one.txt", "two.txt"]
 
         for scheme in ("light", "dark"):
-            for w, h in ((1280, 900), (390, 844)):
+            for w, h in ((1440, 900), (390, 844)):
                 page.emulate_media(color_scheme=scheme, reduced_motion="reduce")
                 page.set_viewport_size({"width": w, "height": h})
                 assert page.evaluate("document.documentElement.scrollWidth") <= w, "horizontal scroll"
+                if w > 960:
+                    assert page.evaluate("document.documentElement.scrollHeight") <= h, "desktop page scrolls"
                 page.screenshot(path=SHOTS / f"{scheme}-{w}.png", full_page=True)
         browser.close()
