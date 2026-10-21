@@ -135,3 +135,21 @@ def test_indic_detects_language_before_transcribing(make_wav):
     eng.transcribe_long = lambda asr, wav, lang, mode: calls.setdefault("lang", lang) and "ഹലോ"
     res = eng.transcribe(str(make_wav(seconds=40)), None, "mixed")
     assert calls == {"clip_seconds": 30.0, "lang": "ml"} and res.language == "ml"
+
+
+def test_whisper_gets_samples_not_a_path(make_wav):
+    np = pytest.importorskip("numpy")
+    from types import SimpleNamespace
+    from transcriber.engines.whisper import Whisper
+    seen = {}
+
+    class FakeModel:
+        def transcribe(self, audio, language, vad_filter):
+            seen["audio"] = audio
+            return iter([SimpleNamespace(start=0.0, end=1.0, text=" hello ")]), SimpleNamespace(language="en")
+
+    eng = Whisper()
+    eng.model = FakeModel()
+    res = eng.transcribe(str(make_wav(seconds=1)), None, "native")
+    assert isinstance(seen["audio"], np.ndarray) and seen["audio"].dtype == np.float32 and len(seen["audio"]) == 16000
+    assert res.text == "hello" and res.segments == [{"start": 0.0, "end": 1.0, "text": "hello"}]

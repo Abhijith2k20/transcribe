@@ -1,4 +1,5 @@
 import os
+import wave
 
 from .base import Engine, TranscriptResult, free_memory
 
@@ -30,6 +31,10 @@ class Whisper(Engine):
         free_memory()
 
     def transcribe(self, wav_path, lang, mode):
-        segments, info = self.model.transcribe(wav_path, language=lang or None, vad_filter=True)
+        # Pass samples, not the path: faster-whisper's own decoder breaks on newer PyAV (metadata_errors).
+        import numpy as np
+        with wave.open(wav_path) as w:
+            audio = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768
+        segments, info = self.model.transcribe(audio, language=lang or None, vad_filter=True)
         segs = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segments]
         return TranscriptResult(" ".join(s["text"] for s in segs), info.language, segs)
