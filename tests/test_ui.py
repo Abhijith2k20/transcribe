@@ -48,6 +48,8 @@ def test_upload_two_files(base_url, make_wav, tmp_path):
         page.set_input_files("#file", files)
         pw.expect(page.locator(".item .chip")).to_have_text(["Done", "Done"], timeout=10000)
         pw.expect(page.locator("#count")).to_have_text("2 of 2 done")
+        pw.expect(page.locator("#empty")).to_be_hidden()
+        pw.expect(page.locator(".retry").first).to_be_hidden()
 
         page.locator(".item .copy").first.click()
         pw.expect(page.locator("#toast")).to_have_text("Copied")
@@ -61,7 +63,7 @@ def test_upload_two_files(base_url, make_wav, tmp_path):
 
         for scheme in ("light", "dark"):
             for w, h in ((1280, 900), (390, 844)):
-                page.emulate_media(color_scheme=scheme)
+                page.emulate_media(color_scheme=scheme, reduced_motion="reduce")
                 page.set_viewport_size({"width": w, "height": h})
                 assert page.evaluate("document.documentElement.scrollWidth") <= w, "horizontal scroll"
                 page.screenshot(path=SHOTS / f"{scheme}-{w}.png", full_page=True)
