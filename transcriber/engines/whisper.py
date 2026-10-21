@@ -11,7 +11,7 @@ LANGS = ("af am ar as az ba be bg bn bo br bs ca cs cy da de el en es et eu fa f
 class Whisper(Engine):
     id = "whisper"
     label = "Whisper"
-    description = "Best for pure English or non-Indian languages. Picks one language per file, so mixed speech suffers."
+    description = "English and non-Indian languages. Weak on mixed speech."
     languages = [""] + LANGS
     modes = ["native"]
     vram_gb = 4.5

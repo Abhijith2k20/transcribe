@@ -45,7 +45,7 @@ class IndicEngine(Engine):
         free_memory()
 
     def transcribe(self, wav_path, lang, mode):
-        kw = {"lang": lang} if lang else {}   # omitting lang = auto-detect
+        kw = {"lang": lang or "auto"}   # the model card's code for automatic language ID
         if self.pass_mode:
             kw["mode"] = mode
         out = self.transcribe_long(self.asr, wav_path, **kw)
@@ -59,7 +59,7 @@ class IndicEngine(Engine):
 class IndicFlex(IndicEngine):
     id = "indic-flex"
     label = "Indic-Transcribe Flex"
-    description = "Best for Indian languages mixed with English. Keeps English words in English."
+    description = "Indian languages, including speech mixed with English."
     languages = [""] + CORE_LANGS + ["hne", "bgc"]
     modes = ["mixed", "native", "romanized"]
     gated_repo = "bodhan-ai/indic-transcribe-flex"

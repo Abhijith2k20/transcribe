@@ -8,6 +8,8 @@ A free, one-click transcription tool. The badge opens a Colab notebook that load
 
 1. Click **Open in Colab** above.
 2. **Runtime → Change runtime type → T4 GPU**.
+That's enough to start: without a Hugging Face token the page runs with Whisper. For better Tamil/Malayalam, also:
+
 3. Make a Hugging Face **read** token at <https://huggingface.co/settings/tokens>. In Colab, click the key icon (Secrets) on the left, add a secret named `HF_TOKEN`, and turn on **Notebook access**.
 4. With the same Hugging Face account, accept the licenses at
    [indic-transcribe-flex](https://huggingface.co/bodhan-ai/indic-transcribe-flex) and

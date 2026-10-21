@@ -101,3 +101,12 @@ def test_gated_engine_fails_with_license_message(make_wav):
         j = wait(client, client.post("/api/jobs", files={"file": ("x.wav", f)}, data={"engine": "g"}).json()["id"])
     assert j["error"] == "Accept the license at huggingface.co/org/g, then try again."
     assert client.get("/api/engines").json()[0]["available"] is False
+
+
+def test_locked_engine_is_rejected_and_reported(make_wav):
+    store = JobStore({"mock": FastMock()}, "cpu", "mock")
+    store.locked = {"mock"}
+    client = TestClient(create_app(store))
+    e = client.get("/api/engines").json()[0]
+    assert e["locked"] is True and e["available"] is False
+    assert "Hugging Face token" in upload(client, make_wav()).json()["detail"]

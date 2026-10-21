@@ -44,6 +44,7 @@ class JobStore:
         self.order: list[str] = []
         self.loaded = None             # the Engine currently in memory
         self.unavailable: set[str] = set()   # gated engines whose license isn't accepted yet
+        self.locked: set[str] = set()        # gated engines with no Hugging Face token at all
         self.tmp = tempfile.mkdtemp(prefix="transcriber-")
         self.q: queue.Queue[Job] = queue.Queue()
         threading.Thread(target=self._worker, daemon=True).start()

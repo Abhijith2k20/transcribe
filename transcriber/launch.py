@@ -21,12 +21,26 @@ def device() -> str:
         return "cpu"
 
 
+def has_hf_token() -> bool:
+    try:
+        from huggingface_hub import get_token
+        return bool(get_token())
+    except ImportError:
+        return False
+
+
 def serve(engine: str = "indic-flex", port: int = 8000, use_tunnel: bool = True, block: bool = True) -> str:
     engines = registry()
     engine = os.environ.get("TRANSCRIBER_ENGINE") or engine
     if engine not in engines:
         raise SystemExit(f"Unknown engine '{engine}'. Choose from: {', '.join(engines)}")
+    locked = set() if has_hf_token() else {e.id for e in engines.values() if e.gated_repo}
+    if engine in locked:
+        print(f"No Hugging Face token, so starting with Whisper instead of {engine}. "
+              "Add an HF_TOKEN secret and run all again to unlock the Indic models.")
+        engine = "whisper"
     store = JobStore(engines, device(), engine)
+    store.locked = locked
 
     print(f"Loading {engines[engine].label} on {store.device.upper()}… (first run downloads the model)")
     try:
@@ -43,8 +57,9 @@ def serve(engine: str = "indic-flex", port: int = 8000, use_tunnel: bool = True,
     while not server.started:
         time.sleep(0.1)
 
-    url, public = tunnel.start(port) if use_tunnel else (f"http://localhost:{port}", True)
-    tunnel.show_link(url, public)
+    url, backup = tunnel.start(port) if use_tunnel else (f"http://localhost:{port}", None)
+    tunnel.show_link(url, backup)
+    url = url or backup
     while block:
         time.sleep(300)
         print(time.strftime("%H:%M"), "still running:", url, flush=True)

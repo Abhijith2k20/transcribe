@@ -42,14 +42,19 @@ async function loadEngines() {
   box.replaceChildren(...engines.map((e) => {
     const label = document.createElement("label");
     label.className = "engine";
-    if (!e.available) label.dataset.unavailable = "";
+    if (e.locked) label.dataset.locked = "";
+    else if (!e.available) label.dataset.unavailable = "";
     label.innerHTML = `<input type="radio" name="engine"><span class="engine-label"></span><span class="engine-desc"></span>`;
     const input = label.querySelector("input");
     input.value = e.id;
-    input.checked = keep ? keep === e.id : e.default;
+    input.disabled = e.locked;
+    input.checked = !e.locked && (keep ? keep === e.id : e.default);
     label.querySelector(".engine-label").textContent = e.label;
     const desc = label.querySelector(".engine-desc");
-    if (e.available) desc.textContent = e.description;
+    if (e.locked) {
+      desc.append("Add a Hugging Face token to unlock better Tamil/Malayalam. ");
+      desc.append(Object.assign(document.createElement("a"), { href: "https://github.com/Abhijith2k20/transcribe#first-time-setup", target: "_blank", rel: "noopener", textContent: "How" }));
+    } else if (e.available) desc.textContent = e.description;
     else {
       desc.append("Accept the license on Hugging Face first: ");
       const a = Object.assign(document.createElement("a"), { href: `https://huggingface.co/${e.gated_repo}`, target: "_blank", rel: "noopener", textContent: e.gated_repo });
@@ -58,7 +63,7 @@ async function loadEngines() {
     input.addEventListener("change", renderOptions);
     return label;
   }));
-  if (!selectedEngine() && engines[0]) box.querySelector("input").checked = true;
+  if (!selectedEngine()) { const first = box.querySelector("input:not(:disabled)"); if (first) first.checked = true; }
   renderOptions();
 }
 

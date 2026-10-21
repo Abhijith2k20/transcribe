@@ -42,7 +42,8 @@ def create_app(store: JobStore) -> FastAPI:
     @app.get("/api/engines")
     def engines():
         return [{"id": e.id, "label": e.label, "description": e.description, "languages": e.languages,
-                 "modes": e.modes, "available": e.id not in store.unavailable, "gated_repo": e.gated_repo,
+                 "modes": e.modes, "available": e.id not in store.unavailable and e.id not in store.locked,
+                 "locked": e.id in store.locked, "gated_repo": e.gated_repo,
                  "loaded": store.loaded is e, "default": e.id == store.default}
                 for e in store.engines.values()]
 
@@ -52,6 +53,8 @@ def create_app(store: JobStore) -> FastAPI:
         eng = store.engines.get(engine)
         if not eng:
             raise HTTPException(400, f"Unknown engine: {engine}")
+        if engine in store.locked:
+            raise HTTPException(400, f"{eng.label} needs a Hugging Face token. Add HF_TOKEN in Colab and run all again.")
         if lang not in eng.languages:
             raise HTTPException(400, f"{eng.label} doesn't support language '{lang}'.")
         mode = mode or eng.modes[0]
