@@ -103,43 +103,48 @@ function renderFiles() {
   $("#files").replaceChildren(...files.map((f) => {
     const li = document.createElement("li");
     li.className = "file";
-    li.setAttribute("aria-current", f === current);
-    li.innerHTML = `<span class="file-icon" aria-hidden="true">${MUSIC}</span><div class="file-id"><p class="file-name"></p><p class="file-meta"></p></div>`;
+    if (f === current) li.dataset.current = "";
+    li.innerHTML = `<button type="button" class="file-select"><span class="file-icon" aria-hidden="true">${MUSIC}</span><span class="file-id"><span class="file-name"></span><span class="file-meta"></span></span></button>`;
+    const sel = li.querySelector(".file-select");
+    sel.setAttribute("aria-pressed", f === current);
     li.querySelector(".file-name").textContent = f.file.name;
     const st = document.createElement("span");
     st.className = f.status === "done" ? "st-done" : f.status === "failed" ? "st-failed" : BUSY.includes(f.status) ? "st-busy" : "";
     st.textContent = statusText(f);
     li.querySelector(".file-meta").append(`${fmtSize(f.file.size)} · `, st);
-    li.tabIndex = 0;
-    li.setAttribute("aria-label", `${f.file.name}, ${statusText(f)}. Show transcription.`);
-    li.onclick = () => { current = f; render(); };
-    li.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); li.click(); } };
-    if (!BUSY.includes(f.status)) {
-      const x = Object.assign(document.createElement("button"), { type: "button", className: "remove", innerHTML: CLOSE });
-      x.setAttribute("aria-label", `Remove ${f.file.name}`);
-      x.onclick = (e) => {
-        e.stopPropagation();
-        files.splice(files.indexOf(f), 1);
-        if (current === f) current = files[0] || null;
-        render();
-      };
-      li.append(x);
-    }
+    sel.onclick = () => { current = f; render(); };
+    const busy = BUSY.includes(f.status);
+    const x = Object.assign(document.createElement("button"), { type: "button", className: "remove", innerHTML: CLOSE });
+    x.setAttribute("aria-label", `${busy ? "Cancel" : "Remove"} ${f.file.name}`);
+    x.title = busy ? "Cancel" : "Remove";
+    x.onclick = () => {
+      if (busy && f.jobId) api(`/api/jobs/${f.jobId}`, { method: "DELETE" }).catch(() => {});
+      files.splice(files.indexOf(f), 1);
+      if (current === f) current = files[0] || null;
+      render();
+    };
+    li.append(x);
     return li;
   }));
 }
 
 const pending = () => files.filter((f) => (f.status === "ready" || f.status === "failed") && f.file.size <= MAX_BYTES);
 function renderStart() {
-  $("#start").disabled = !pending().length || !selected() || selected().locked;
+  const e = selected();
+  const why = e?.locked ? "This model needs a Hugging Face token."
+    : !files.length ? "Add a recording to start."
+    : !pending().length ? (files.some((f) => BUSY.includes(f.status)) ? "Transcribing…" : "All files are transcribed. Add more to continue.")
+    : "";
+  $("#start").disabled = !!why || !e;
+  $("#start-hint").textContent = why;
 }
 
 function renderOutput() {
   const out = $("#output"), f = current;
   const done = files.filter((x) => x.status === "done");
-  $("#copy").disabled = f?.status !== "done";
-  $("#download").disabled = !done.length;
-  $("#download").lastChild.textContent = done.length > 1 ? " Download all" : " Download";
+  $("#copy").disabled = $("#download").disabled = f?.status !== "done";
+  $("#download-all").hidden = done.length < 2;
+  $("#download-all").lastChild.textContent = ` Download all (${done.length})`;
 
   const place = (title, text, extra = "", cls = "") => {
     out.innerHTML = `<div class="placeholder ${cls}">${extra}<strong></strong><span></span></div>`;
@@ -172,7 +177,7 @@ function renderOutput() {
 
 function render() {
   $("#drop").classList.toggle("compact", files.length > 0);
-  $(".drop-title").textContent = files.length ? "Add more files" : "Click to upload or drag and drop";
+  $(".drop-title").textContent = files.length ? "Add more files" : "Choose files or drag them here";
   renderFiles();
   renderStart();
   renderOutput();
@@ -194,6 +199,7 @@ async function upload(f) {
   fd.append("mode", f.s.mode);
   try {
     f.jobId = (await api("/api/jobs", { method: "POST", body: fd })).id;
+    if (!files.includes(f)) return api(`/api/jobs/${f.jobId}`, { method: "DELETE" }).catch(() => {});
     poll(f, f.jobId);
   } catch (e) {
     finish(f, "failed", e.status ? e.message : OFFLINE);
@@ -225,12 +231,13 @@ function finish(f, status, error) {
 /* ---------- copy / download ---------- */
 $("#copy").onclick = () => navigator.clipboard.writeText(current.job.text).then(() => toast("Copied"), () => toast("Couldn't copy"));
 $("#download").onclick = () => {
-  const done = files.filter((f) => f.status === "done");
-  if (done.length > 1) return save(`/api/zip?ids=${done.map((f) => f.jobId).join(",")}`, "transcripts.zip");
-  const blob = new Blob([done[0].job.text + "\n"], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  save(url, stem(done[0].file.name) + ".txt");
+  const url = URL.createObjectURL(new Blob([current.job.text + "\n"], { type: "text/plain;charset=utf-8" }));
+  save(url, stem(current.file.name) + ".txt");
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+$("#download-all").onclick = () => {
+  const ids = files.filter((f) => f.status === "done").map((f) => f.jobId).join(",");
+  save(`/api/zip?ids=${ids}`, "transcripts.zip");
 };
 function save(href, name) {
   Object.assign(document.createElement("a"), { href, download: name }).click();

@@ -153,3 +153,24 @@ def test_whisper_gets_samples_not_a_path(make_wav):
     res = eng.transcribe(str(make_wav(seconds=1)), None, "native")
     assert isinstance(seen["audio"], np.ndarray) and seen["audio"].dtype == np.float32 and len(seen["audio"]) == 16000
     assert res.text == "hello" and res.segments == [{"start": 0.0, "end": 1.0, "text": "hello"}]
+
+
+def test_cancel_drops_queued_job(make_wav):
+    class Slow(Mock):
+        delay = (0.4, 0.4)
+    store = JobStore({"mock": Slow()}, "cpu", "mock")
+    client = TestClient(create_app(store))
+    a, b = (upload(client, make_wav()).json()["id"] for _ in range(2))
+    assert client.delete(f"/api/jobs/{b}").json()["status"] == "cancelled"
+    assert wait(client, a)["status"] == "done"
+    time.sleep(0.1)
+    assert client.get(f"/api/jobs/{b}").json()["status"] == "cancelled"
+
+
+def test_unexpected_error_is_plain_language(make_wav):
+    class Broken(FastMock):
+        def transcribe(self, *a):
+            raise RuntimeError("Library libcublas.so.12 is not found")
+    client = TestClient(create_app(JobStore({"mock": Broken()}, "cpu", "mock")))
+    err = wait(client, upload(client, make_wav()).json()["id"])["error"]
+    assert "libcublas" not in err and err.startswith("Mock engine couldn't transcribe this file.")

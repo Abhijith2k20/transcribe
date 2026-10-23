@@ -58,9 +58,14 @@ def test_upload_two_files(base_url, make_wav, tmp_path):
 
         with page.expect_download() as dl:
             page.click("#download")
+        assert dl.value.suggested_filename == "one.txt"
+        pw.expect(page.locator("#download-all")).to_have_text("Download all (2)")
+        with page.expect_download() as dl:
+            page.click("#download-all")
         z = tmp_path / "all.zip"
         dl.value.save_as(z)
         assert sorted(zipfile.ZipFile(z).namelist()) == ["one.txt", "two.txt"]
+        pw.expect(page.locator("#start-hint")).to_have_text("All files are transcribed. Add more to continue.")
 
         for scheme in ("light", "dark"):
             for w, h in ((1440, 900), (390, 844)):

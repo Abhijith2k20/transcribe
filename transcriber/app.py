@@ -78,6 +78,14 @@ def create_app(store: JobStore) -> FastAPI:
                 "elapsed_seconds": round(time.time() - job.started) if job.started else 0,
                 "audio_seconds": job.audio_seconds}
 
+    @app.delete("/api/jobs/{job_id}")
+    def cancel_job(job_id: str):
+        job = store.jobs.get(job_id)
+        if not job:
+            raise HTTPException(404, "No such job.")
+        store.cancel(job)
+        return {"status": job.status}
+
     @app.get("/api/zip")
     def zip_(ids: str = Query("")):
         buf, used = io.BytesIO(), set()

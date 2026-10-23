@@ -28,6 +28,7 @@ class Job:
     language: str | None = None
     segments: list[dict] | None = None
     error: str | None = None
+    cancelled: bool = False
     started: float | None = None
     audio_seconds: float | None = None
 
@@ -66,6 +67,12 @@ class JobStore:
         i = self.order.index(job.id)
         return sum(self.jobs[j].status in ACTIVE for j in self.order[:i])
 
+    def cancel(self, job: Job):
+        """Queued jobs are dropped; a job already on the GPU finishes but its result is thrown away."""
+        job.cancelled = True
+        if job.status == "queued":
+            job.status = "cancelled"
+
     def ensure_loaded(self, engine_id: str, job: Job | None = None):
         eng = self.engines[engine_id]
         if self.loaded is eng:
@@ -87,6 +94,9 @@ class JobStore:
     def _worker(self):
         while True:
             job = self.q.get()
+            if job.cancelled:
+                self._cleanup(job)
+                continue
             try:
                 self._run(job)
             except AudioError:
@@ -94,14 +104,21 @@ class JobStore:
             except LicenseError as e:
                 job.error = f"Accept the license at huggingface.co/{e.repo}, then try again."
             except Exception as e:
-                traceback.print_exc()
+                traceback.print_exc()  # technical details stay in the Colab output
+                label = self.engines[job.engine].label
                 job.error = ("The GPU ran out of memory on this file. Try a shorter recording."
-                             if is_oom(e) else f"Transcription failed: {e}")
+                             if is_oom(e) else
+                             f"{label} couldn't transcribe this file. Try another model, or restart the "
+                             "Colab session and try again. Details are in the Colab output.")
             finally:
-                job.status = "failed" if job.error else "done"
-                shutil.rmtree(job.src + ".d", ignore_errors=True)
-                if os.path.exists(job.src):
-                    os.remove(job.src)
+                job.status = "cancelled" if job.cancelled else "failed" if job.error else "done"
+                self._cleanup(job)
+
+    @staticmethod
+    def _cleanup(job: Job):
+        shutil.rmtree(job.src + ".d", ignore_errors=True)
+        if os.path.exists(job.src):
+            os.remove(job.src)
 
     def _run(self, job: Job):
         os.makedirs(job.src + ".d")
